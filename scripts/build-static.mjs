@@ -8,6 +8,10 @@ const distDir = path.join(root, "dist");
 const clientDir = path.join(distDir, "client");
 const staticDir = path.join(distDir, "static");
 const viteBin = path.join(root, "node_modules", "vite", "bin", "vite.js");
+const repositoryName = process.env.GITHUB_REPOSITORY?.split("/").pop() ?? "starfruit-express";
+const staticBasePath = normalizeBasePath(
+  process.env.STATIC_BASE_PATH ?? `/${repositoryName}/`,
+);
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -45,13 +49,15 @@ async function renderRoute(pathname) {
   return response.text();
 }
 
-function normalizeStaticHtml(html) {
-  return html.replaceAll("/./assets/", "./assets/");
+function normalizeBasePath(value) {
+  if (value === "/" || value === "./") return value;
+
+  return `/${value.replace(/^\/+|\/+$/g, "")}/`;
 }
 
 await run(process.execPath, [viteBin, "build"], {
   env: {
-    VITE_BASE_PATH: "./",
+    VITE_BASE_PATH: staticBasePath,
   },
 });
 
@@ -59,10 +65,10 @@ await rm(staticDir, { recursive: true, force: true });
 await mkdir(staticDir, { recursive: true });
 await cp(clientDir, staticDir, { recursive: true });
 
-const html = normalizeStaticHtml(await renderRoute("/"));
+const html = await renderRoute(staticBasePath);
 
 await writeFile(path.join(staticDir, "index.html"), html);
 await writeFile(path.join(staticDir, "404.html"), html);
 await writeFile(path.join(staticDir, ".nojekyll"), "");
 
-console.log("Static export generated at dist/static");
+console.log(`Static export generated at dist/static with base path ${staticBasePath}`);
